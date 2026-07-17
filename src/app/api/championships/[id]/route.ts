@@ -1,0 +1,29 @@
+import { NextResponse } from "next/server";
+import { backendFetch } from "@/lib/api/backend";
+
+type Params = { params: Promise<{ id: string }> };
+
+function jsonResult(result: Awaited<ReturnType<typeof backendFetch>>) {
+  return NextResponse.json(
+    result.body ?? { success: false, error: "Resposta vazia" },
+    { status: result.status || 502 },
+  );
+}
+function errorResponse(error: unknown) {
+  return NextResponse.json(
+    {
+      success: false,
+      error: error instanceof Error ? error.message : "Erro interno no proxy",
+    },
+    { status: 500 },
+  );
+}
+
+export async function GET(_request: Request, { params }: Params) {
+  try {
+    const { id } = await params;
+    return jsonResult(await backendFetch(`/championships/${id}`));
+  } catch (error) {
+    return errorResponse(error);
+  }
+}

@@ -3,11 +3,13 @@ import { EncryptJWT, jwtDecrypt } from "jose";
 import type { TokenPayload } from "./types";
 
 function getEncryptionKey(): Uint8Array {
-  const secret = process.env.JWT_ENCRYPTION_SECRET;
+  const secret = process.env.NEXT_PUBLIC_JWT_ENCRYPTION_SECRET?.trim();
 
   if (!secret || secret.length < 32) {
     throw new Error(
-      "JWT_ENCRYPTION_SECRET must be defined and at least 32 characters",
+      "NEXT_PUBLIC_JWT_ENCRYPTION_SECRET must be defined and at least 32 characters" +
+        ` (got length=${secret?.length ?? 0}). ` +
+        "Defina em .env.local e reinicie o Next.js.",
     );
   }
 

@@ -3,13 +3,13 @@ import { EncryptJWT, jwtDecrypt } from "jose";
 import type { TokenPayload } from "./types";
 
 function getEncryptionKey(): Uint8Array {
+  // Acesso estático — Next/Turbopack só faz inline assim
   const secret = process.env.NEXT_PUBLIC_JWT_ENCRYPTION_SECRET?.trim();
 
   if (!secret || secret.length < 32) {
     throw new Error(
       "NEXT_PUBLIC_JWT_ENCRYPTION_SECRET must be defined and at least 32 characters" +
-        ` (got length=${secret?.length ?? 0}). ` +
-        "Defina em .env.local e reinicie o Next.js.",
+        ` (got length=${secret?.length ?? 0}). Reinicie o Next após alterar o .env.`,
     );
   }
 

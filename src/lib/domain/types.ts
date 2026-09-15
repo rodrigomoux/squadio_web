@@ -4,8 +4,35 @@ export interface OpeningHour {
   close: string;
 }
 
+export interface Establishment {
+  _id: string;
+  ownerId: string;
+  name: string;
+  description?: string;
+  address: string;
+  location?: {
+    type: "Point";
+    coordinates: [number, number];
+  };
+  photos: string[];
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface EstablishmentFormData {
+  name: string;
+  description?: string;
+  address: string;
+  lat: number;
+  lng: number;
+  photos?: string[];
+}
+
 export interface Court {
   _id: string;
+  establishmentId?: string;
+  establishment?: { _id: string; name: string };
   ownerId: string;
   name: string;
   description?: string;
@@ -17,6 +44,8 @@ export interface Court {
   modalities: string[];
   photos: string[];
   pricePerHour: number;
+  /** Quadra pública: horários + chat por slot, sem reserva */
+  isPublic?: boolean;
   openingHours: OpeningHour[];
   active: boolean;
   averageRating?: number;
@@ -25,14 +54,13 @@ export interface Court {
 }
 
 export interface CourtFormData {
+  establishmentId: string;
   name: string;
   description?: string;
-  address: string;
-  lat: number;
-  lng: number;
   modalities: string[];
   photos?: string[];
   pricePerHour: number;
+  isPublic?: boolean;
   openingHours: OpeningHour[];
 }
 
@@ -124,3 +152,68 @@ export interface ApiEnvelope<T> {
   data: T;
   error?: string;
 }
+
+export interface SystemApiKeysForm {
+  mapsApiKey: string;
+  paymentApiKey: string;
+  paymentSecretKey: string;
+  emailApiKey: string;
+  firebaseServerKey: string;
+  custom: Record<string, string>;
+}
+
+export interface SystemWhatsAppConfig {
+  enabled: boolean;
+  metaPhoneNumberId: string;
+  metaBusinessAccountId: string;
+  metaAccessToken: string;
+  metaVerifyToken: string;
+  metaAppSecret: string;
+}
+
+export interface SystemAiConfig {
+  provider: "gemini" | "grok";
+  geminiApiKey: string;
+  grokApiKey: string;
+  modelGemini: string;
+  modelGrok: string;
+  systemPrompt: string;
+}
+
+export interface SystemConfig {
+  establishmentDuplicateCheckEnabled: boolean;
+  establishmentDuplicateRadiusMeters: number;
+  appName: string;
+  supportEmail: string;
+  apiKeys: SystemApiKeysForm;
+  apiKeysConfigured: {
+    mapsApiKey: boolean;
+    paymentApiKey: boolean;
+    paymentSecretKey: boolean;
+    emailApiKey: boolean;
+    firebaseServerKey: boolean;
+  };
+  whatsapp: SystemWhatsAppConfig;
+  whatsappConfigured: {
+    metaAccessToken: boolean;
+    metaVerifyToken: boolean;
+    metaAppSecret: boolean;
+    metaPhoneNumberId: boolean;
+  };
+  ai: SystemAiConfig;
+  aiConfigured: {
+    geminiApiKey: boolean;
+    grokApiKey: boolean;
+  };
+  updatedAt?: string;
+}
+
+export type SystemConfigPatch = {
+  establishmentDuplicateCheckEnabled?: boolean;
+  establishmentDuplicateRadiusMeters?: number;
+  appName?: string;
+  supportEmail?: string;
+  apiKeys?: Partial<SystemApiKeysForm>;
+  whatsapp?: Partial<SystemWhatsAppConfig>;
+  ai?: Partial<SystemAiConfig>;
+};

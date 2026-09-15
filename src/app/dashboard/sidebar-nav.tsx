@@ -3,8 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { useAuth } from "@/providers/AuthProvider";
+
 const nav = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/dashboard/establishments", label: "Localidades" },
   { href: "/dashboard/courts", label: "Quadras" },
   { href: "/dashboard/reservations", label: "Reservas" },
   { href: "/dashboard/products", label: "Produtos" },
@@ -13,13 +16,20 @@ const nav = [
   { href: "/dashboard/championships", label: "Campeonatos" },
 ];
 
+const adminNav = [
+  { href: "/dashboard/system-config", label: "Configurações" },
+];
+
 export function SidebarNav({ horizontal = false }: { horizontal?: boolean }) {
   const pathname = usePathname();
+  const { user } = useAuth();
+  const items =
+    user?.role === "admin" ? [...nav, ...adminNav] : nav;
 
   if (horizontal) {
     return (
       <div className="flex gap-1 overflow-x-auto py-2">
-        {nav.map((item) => {
+        {items.map((item) => {
           const active =
             item.href === "/dashboard"
               ? pathname === item.href
@@ -44,7 +54,7 @@ export function SidebarNav({ horizontal = false }: { horizontal?: boolean }) {
 
   return (
     <nav className="flex flex-1 flex-col gap-0.5 p-3">
-      {nav.map((item) => {
+      {items.map((item) => {
         const active =
           item.href === "/dashboard"
             ? pathname === item.href

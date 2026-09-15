@@ -97,5 +97,5 @@ O interceptor adiciona automaticamente o header `Authorization` e renova o token
 | Variável | Descrição |
 |---|---|
 | `NEXT_PUBLIC_API_URL` | URL base da API backend |
-| `JWT_ENCRYPTION_SECRET` | Chave de encriptação (mín. 32 caracteres) |
+| `NEXT_PUBLIC_JWT_ENCRYPTION_SECRET` | Chave de encriptação (mín. 32 caracteres) |
 | `API_TIMEOUT` | Timeout das requisições em ms (opcional) |

@@ -12,5 +12,6 @@ export async function getSession(): Promise<AuthUser | null> {
     id: payload.sub,
     email: payload.email,
     name: payload.name,
+    role: payload.role,
   };
 }

@@ -1,13 +1,18 @@
+import { apiFetch } from "@/lib/api/apiFetch";
 import type {
   ApiEnvelope,
   AvailabilitySlot,
   Championship,
   Court,
   CourtFormData,
+  Establishment,
+  EstablishmentFormData,
   Match,
   Order,
   Product,
   Reservation,
+  SystemConfig,
+  SystemConfigPatch,
   Team,
 } from "@/lib/domain/types";
 
@@ -40,28 +45,113 @@ async function parse<T>(response: Response): Promise<T> {
   return body.data;
 }
 
+export type MediaUploadResult = {
+  url: string;
+  thumbUrl: string;
+  full: string;
+  thumb?: string;
+  host: string;
+  name: string;
+  extension: string;
+  id?: string;
+};
+
+export class MediaService {
+  static async uploadBase64(base64: string): Promise<MediaUploadResult> {
+    const data = await parse<{ media: MediaUploadResult }>(
+      await apiFetch("/api/media/upload", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ base64 }),
+      }),
+    );
+    return data.media;
+  }
+}
+
+export class EstablishmentsService {
+  static async list(params?: { ownerId?: string }): Promise<Establishment[]> {
+    const qs = new URLSearchParams();
+    if (params?.ownerId) qs.set("ownerId", params.ownerId);
+    const suffix = qs.toString() ? `?${qs}` : "";
+    const data = await parse<{ establishments: Establishment[] }>(
+      await apiFetch(`/api/establishments${suffix}`, { credentials: "include" }),
+    );
+    return data.establishments ?? [];
+  }
+
+  static async get(id: string): Promise<Establishment> {
+    const data = await parse<{ establishment: Establishment }>(
+      await apiFetch(`/api/establishments/${id}`, { credentials: "include" }),
+    );
+    return data.establishment;
+  }
+
+  static async create(payload: EstablishmentFormData): Promise<Establishment> {
+    const data = await parse<{ establishment: Establishment }>(
+      await apiFetch("/api/establishments", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }),
+    );
+    return data.establishment;
+  }
+
+  static async update(
+    id: string,
+    payload: Partial<EstablishmentFormData>,
+  ): Promise<Establishment> {
+    const data = await parse<{ establishment: Establishment }>(
+      await apiFetch(`/api/establishments/${id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }),
+    );
+    return data.establishment;
+  }
+
+  static async remove(id: string): Promise<void> {
+    await parse(
+      await apiFetch(`/api/establishments/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      }),
+    );
+  }
+}
+
 export class CourtsService {
-  static async list(params?: { modality?: string; ownerId?: string }): Promise<Court[]> {
+  static async list(params?: {
+    modality?: string;
+    ownerId?: string;
+    establishmentId?: string;
+  }): Promise<Court[]> {
     const qs = new URLSearchParams();
     if (params?.modality) qs.set("modality", params.modality);
     if (params?.ownerId) qs.set("ownerId", params.ownerId);
+    if (params?.establishmentId) qs.set("establishmentId", params.establishmentId);
     const suffix = qs.toString() ? `?${qs}` : "";
     const data = await parse<{ courts: Court[] }>(
-      await fetch(`/api/courts${suffix}`, { credentials: "include" }),
+      await apiFetch(`/api/courts${suffix}`, { credentials: "include" }),
     );
     return data.courts ?? [];
   }
 
   static async get(id: string): Promise<Court> {
     const data = await parse<{ court: Court }>(
-      await fetch(`/api/courts/${id}`, { credentials: "include" }),
+      await apiFetch(`/api/courts/${id}`, { credentials: "include" }),
     );
     return data.court;
   }
 
   static async create(payload: CourtFormData): Promise<Court> {
     const data = await parse<{ court: Court }>(
-      await fetch("/api/courts", {
+      await apiFetch("/api/courts", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -73,7 +163,7 @@ export class CourtsService {
 
   static async update(id: string, payload: Partial<CourtFormData>): Promise<Court> {
     const data = await parse<{ court: Court }>(
-      await fetch(`/api/courts/${id}`, {
+      await apiFetch(`/api/courts/${id}`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -85,7 +175,7 @@ export class CourtsService {
 
   static async remove(id: string): Promise<void> {
     await parse(
-      await fetch(`/api/courts/${id}`, {
+      await apiFetch(`/api/courts/${id}`, {
         method: "DELETE",
         credentials: "include",
       }),
@@ -94,7 +184,7 @@ export class CourtsService {
 
   static async availability(id: string, date: string): Promise<AvailabilitySlot[]> {
     const data = await parse<{ slots: AvailabilitySlot[] }>(
-      await fetch(
+      await apiFetch(
         `/api/courts/${id}/availability?date=${encodeURIComponent(date)}`,
         { credentials: "include" },
       ),
@@ -117,7 +207,7 @@ export class ReservationsService {
     if (params?.mine === false) qs.set("mine", "false");
     const suffix = qs.toString() ? `?${qs}` : "";
     const data = await parse<{ reservations: Reservation[] }>(
-      await fetch(`/api/reservations${suffix}`, { credentials: "include" }),
+      await apiFetch(`/api/reservations${suffix}`, { credentials: "include" }),
     );
     return data.reservations ?? [];
   }
@@ -130,7 +220,7 @@ export class ReservationsService {
     userId?: string;
   }): Promise<Reservation> {
     const data = await parse<{ reservation: Reservation }>(
-      await fetch("/api/reservations", {
+      await apiFetch("/api/reservations", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -142,7 +232,7 @@ export class ReservationsService {
 
   static async cancel(id: string): Promise<void> {
     await parse(
-      await fetch(`/api/reservations/${id}/cancel`, {
+      await apiFetch(`/api/reservations/${id}/cancel`, {
         method: "POST",
         credentials: "include",
       }),
@@ -157,7 +247,7 @@ export class ProductsService {
     if (params?.all) qs.set("all", "true");
     const suffix = qs.toString() ? `?${qs}` : "";
     const data = await parse<{ products: Product[] }>(
-      await fetch(`/api/products${suffix}`, { credentials: "include" }),
+      await apiFetch(`/api/products${suffix}`, { credentials: "include" }),
     );
     return data.products ?? [];
   }
@@ -171,7 +261,7 @@ export class ProductsService {
     stock?: number | null;
   }): Promise<Product> {
     const data = await parse<{ product: Product }>(
-      await fetch("/api/products", {
+      await apiFetch("/api/products", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -193,7 +283,7 @@ export class ProductsService {
     }>,
   ): Promise<Product> {
     const data = await parse<{ product: Product }>(
-      await fetch(`/api/products/${id}`, {
+      await apiFetch(`/api/products/${id}`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -205,7 +295,7 @@ export class ProductsService {
 
   static async remove(id: string): Promise<void> {
     await parse(
-      await fetch(`/api/products/${id}`, {
+      await apiFetch(`/api/products/${id}`, {
         method: "DELETE",
         credentials: "include",
       }),
@@ -225,7 +315,7 @@ export class OrdersService {
     if (params?.status) qs.set("status", params.status);
     const suffix = qs.toString() ? `?${qs}` : "";
     const data = await parse<{ orders: Order[] }>(
-      await fetch(`/api/orders${suffix}`, { credentials: "include" }),
+      await apiFetch(`/api/orders${suffix}`, { credentials: "include" }),
     );
     return data.orders ?? [];
   }
@@ -237,7 +327,7 @@ export class OrdersService {
     payNow?: boolean;
   }): Promise<Order> {
     const data = await parse<{ order: Order }>(
-      await fetch("/api/orders", {
+      await apiFetch("/api/orders", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -260,7 +350,7 @@ export class ChampionshipsService {
     if (params?.organizerId) qs.set("organizerId", params.organizerId);
     const suffix = qs.toString() ? `?${qs}` : "";
     const data = await parse<{ championships: Championship[] }>(
-      await fetch(`/api/championships${suffix}`, { credentials: "include" }),
+      await apiFetch(`/api/championships${suffix}`, { credentials: "include" }),
     );
     return data.championships ?? [];
   }
@@ -273,7 +363,7 @@ export class ChampionshipsService {
     courtId?: string;
   }): Promise<Championship> {
     const data = await parse<{ championship: Championship }>(
-      await fetch("/api/championships", {
+      await apiFetch("/api/championships", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -289,13 +379,13 @@ export class ChampionshipsService {
     teams: Team[];
   }> {
     return parse(
-      await fetch(`/api/championships/${id}`, { credentials: "include" }),
+      await apiFetch(`/api/championships/${id}`, { credentials: "include" }),
     );
   }
 
   static async joinTeam(id: string, teamId: string): Promise<Championship> {
     const data = await parse<{ championship: Championship }>(
-      await fetch(`/api/championships/${id}/teams`, {
+      await apiFetch(`/api/championships/${id}/teams`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -307,7 +397,7 @@ export class ChampionshipsService {
 
   static async generateBracket(id: string) {
     return parse(
-      await fetch(`/api/championships/${id}/generate-bracket`, {
+      await apiFetch(`/api/championships/${id}/generate-bracket`, {
         method: "POST",
         credentials: "include",
       }),
@@ -319,7 +409,7 @@ export class ChampionshipsService {
     payload: { homeScore: number; awayScore: number; autoConfirm?: boolean },
   ): Promise<Match> {
     const data = await parse<{ match: Match }>(
-      await fetch(`/api/matches/${matchId}/report`, {
+      await apiFetch(`/api/matches/${matchId}/report`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -333,7 +423,7 @@ export class ChampionshipsService {
 export class TeamsService {
   static async listMine(): Promise<Team[]> {
     const data = await parse<{ teams: Team[] }>(
-      await fetch("/api/teams?mine=true", { credentials: "include" }),
+      await apiFetch("/api/teams?mine=true", { credentials: "include" }),
     );
     return data.teams ?? [];
   }
@@ -343,7 +433,7 @@ export class TeamsService {
     modality: string;
   }): Promise<Team> {
     const data = await parse<{ team: Team }>(
-      await fetch("/api/teams", {
+      await apiFetch("/api/teams", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -351,5 +441,25 @@ export class TeamsService {
       }),
     );
     return data.team;
+  }
+}
+
+export class SystemConfigService {
+  static async get(): Promise<SystemConfig> {
+    const data = await parse<{ config: SystemConfig }>(
+      await apiFetch("/api/system-config"),
+    );
+    return data.config;
+  }
+
+  static async update(payload: SystemConfigPatch): Promise<SystemConfig> {
+    const data = await parse<{ config: SystemConfig }>(
+      await apiFetch("/api/system-config", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }),
+    );
+    return data.config;
   }
 }

@@ -2,10 +2,11 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
+import { PhotoGalleryUpload } from "@/components/media/PhotoGalleryUpload";
+import { fieldClass, labelClass } from "@/components/ui/PageHeader";
 import { SPORT_MODALITIES, WEEKDAYS } from "@/config/sports";
 import type { Court, CourtFormData, OpeningHour } from "@/lib/domain/types";
 import { CourtsService } from "@/services/domain/DomainService";
-import { fieldClass, labelClass } from "@/components/ui/PageHeader";
 
 const defaultHours: OpeningHour[] = WEEKDAYS.map((d) => ({
   dayOfWeek: d.dayOfWeek,
@@ -15,6 +16,11 @@ const defaultHours: OpeningHour[] = WEEKDAYS.map((d) => ({
 
 type Props = {
   initial?: Court | null;
+  /** Obrigatório na criação */
+  establishmentId?: string;
+  establishmentLabel?: string;
+  /** Definido no modal de tipo ao criar; na edição usa o valor da quadra. */
+  defaultIsPublic?: boolean;
   onSuccess?: (court: Court) => void;
   onCancel?: () => void;
   /** Se false, não redireciona (uso em modal) */
@@ -22,45 +28,45 @@ type Props = {
 };
 
 function courtToForm(court: Court): CourtFormData {
-  const [lng, lat] = court.location?.coordinates ?? [-46.6333, -23.5505];
   return {
+    establishmentId: court.establishmentId ?? "",
     name: court.name,
     description: court.description ?? "",
-    address: court.address,
-    lat,
-    lng,
     modalities: court.modalities ?? [],
     photos: court.photos ?? [],
     pricePerHour: court.pricePerHour,
+    isPublic: Boolean(court.isPublic),
     openingHours: court.openingHours?.length ? court.openingHours : defaultHours,
   };
 }
 
-const emptyForm: CourtFormData = {
+const emptyForm = (establishmentId: string, isPublic: boolean): CourtFormData => ({
+  establishmentId,
   name: "",
   description: "",
-  address: "",
-  lat: -23.5505,
-  lng: -46.6333,
   modalities: [],
   photos: [],
-  pricePerHour: 100,
+  pricePerHour: isPublic ? 0 : 100,
+  isPublic,
   openingHours: defaultHours,
-};
+});
 
 export function CourtForm({
   initial,
+  establishmentId,
+  establishmentLabel,
+  defaultIsPublic = false,
   onSuccess,
   onCancel,
   redirectOnSuccess = true,
 }: Props) {
-  const base = useMemo(
-    () => (initial ? courtToForm(initial) : emptyForm),
-    [initial],
-  );
+  const base = useMemo(() => {
+    if (initial) return courtToForm(initial);
+    return emptyForm(establishmentId ?? "", defaultIsPublic);
+  }, [initial, establishmentId, defaultIsPublic]);
 
   const [form, setForm] = useState<CourtFormData>(base);
-  const [photoUrl, setPhotoUrl] = useState("");
+  const isPublic = Boolean(form.isPublic);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -91,15 +97,30 @@ export function CourtForm({
     setError(null);
     setLoading(true);
     try {
-      if (!form.name.trim() || !form.address.trim()) {
-        throw new Error("Nome e endereço são obrigatórios");
+      if (!form.name.trim()) {
+        throw new Error("Nome é obrigatório");
+      }
+      if (!initial && !form.establishmentId) {
+        throw new Error("Selecione uma localidade");
       }
       if (form.modalities.length === 0) {
         throw new Error("Selecione ao menos uma modalidade");
       }
+      const payload: CourtFormData = {
+        ...form,
+        pricePerHour: form.isPublic ? 0 : form.pricePerHour,
+      };
       const court = initial?._id
-        ? await CourtsService.update(initial._id, form)
-        : await CourtsService.create(form);
+        ? await CourtsService.update(initial._id, {
+            name: payload.name,
+            description: payload.description,
+            modalities: payload.modalities,
+            photos: payload.photos,
+            pricePerHour: payload.pricePerHour,
+            isPublic: payload.isPublic,
+            openingHours: payload.openingHours,
+          })
+        : await CourtsService.create(payload);
       onSuccess?.(court);
       if (redirectOnSuccess && !onSuccess) {
         window.location.href = "/dashboard/courts";
@@ -118,13 +139,29 @@ export function CourtForm({
           Dados da quadra
         </h3>
         <div className="grid gap-4 sm:grid-cols-2">
+          {(establishmentLabel || initial?.establishment?.name || initial?.address) && (
+            <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                Localidade
+              </p>
+              <p className="mt-0.5 text-sm font-semibold text-slate-900">
+                {establishmentLabel ||
+                  initial?.establishment?.name ||
+                  "Localidade"}
+              </p>
+              {initial?.address && (
+                <p className="mt-0.5 text-xs text-slate-500">{initial.address}</p>
+              )}
+            </div>
+          )}
           <label className="block sm:col-span-2">
-            <span className={labelClass}>Nome</span>
+            <span className={labelClass}>Nome da quadra</span>
             <input
               required
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               className={fieldClass}
+              placeholder="Ex.: Quadra 1 — Society"
             />
           </label>
           <label className="block sm:col-span-2">
@@ -136,52 +173,32 @@ export function CourtForm({
               className={fieldClass}
             />
           </label>
-          <label className="block sm:col-span-2">
-            <span className={labelClass}>Endereço</span>
-            <input
-              required
-              value={form.address}
-              onChange={(e) => setForm({ ...form, address: e.target.value })}
-              className={fieldClass}
-              placeholder="Rua, número, bairro, cidade"
-            />
-          </label>
-          <label className="block">
-            <span className={labelClass}>Latitude</span>
-            <input
-              type="number"
-              step="any"
-              required
-              value={form.lat}
-              onChange={(e) => setForm({ ...form, lat: Number(e.target.value) })}
-              className={fieldClass}
-            />
-          </label>
-          <label className="block">
-            <span className={labelClass}>Longitude</span>
-            <input
-              type="number"
-              step="any"
-              required
-              value={form.lng}
-              onChange={(e) => setForm({ ...form, lng: Number(e.target.value) })}
-              className={fieldClass}
-            />
-          </label>
-          <label className="block">
-            <span className={labelClass}>Preço / hora (R$)</span>
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              required
-              value={form.pricePerHour}
-              onChange={(e) =>
-                setForm({ ...form, pricePerHour: Number(e.target.value) })
-              }
-              className={fieldClass}
-            />
-          </label>
+          <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-sm font-semibold text-slate-900">
+              {isPublic ? "Quadra pública" : "Quadra privada"}
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              {isPublic
+                ? "Horários com chat por slot, sem reserva paga."
+                : "Aceita reservas e preço por hora."}
+            </p>
+          </div>
+          {!isPublic && (
+            <label className="block">
+              <span className={labelClass}>Preço / hora (R$)</span>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                required
+                value={form.pricePerHour}
+                onChange={(e) =>
+                  setForm({ ...form, pricePerHour: Number(e.target.value) })
+                }
+                className={fieldClass}
+              />
+            </label>
+          )}
         </div>
       </section>
 
@@ -210,52 +227,15 @@ export function CourtForm({
         </div>
       </section>
 
-      <section className="space-y-3">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Fotos (URL)
-        </h3>
-        <div className="flex gap-2">
-          <input
-            value={photoUrl}
-            onChange={(e) => setPhotoUrl(e.target.value)}
-            placeholder="https://..."
-            className={`flex-1 ${fieldClass}`}
-          />
-          <button
-            type="button"
-            className="rounded-lg bg-slate-800 px-4 text-sm font-medium text-white"
-            onClick={() => {
-              if (!photoUrl.trim()) return;
-              setForm((prev) => ({
-                ...prev,
-                photos: [...(prev.photos ?? []), photoUrl.trim()],
-              }));
-              setPhotoUrl("");
-            }}
-          >
-            Add
-          </button>
-        </div>
-        <ul className="space-y-1 text-sm text-slate-600">
-          {(form.photos ?? []).map((url) => (
-            <li key={url} className="flex items-center justify-between gap-2">
-              <span className="truncate">{url}</span>
-              <button
-                type="button"
-                className="text-red-600"
-                onClick={() =>
-                  setForm((prev) => ({
-                    ...prev,
-                    photos: (prev.photos ?? []).filter((p) => p !== url),
-                  }))
-                }
-              >
-                Remover
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {isPublic && (
+        <PhotoGalleryUpload
+          value={form.photos ?? []}
+          onChange={(photos) => setForm((prev) => ({ ...prev, photos }))}
+          max={5}
+          aspect={16 / 9}
+          disabled={loading}
+        />
+      )}
 
       <section className="space-y-3">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">

@@ -21,22 +21,22 @@ export async function setAuthCookies(
 
   cookieStore.set(authConfig.cookies.accessToken, accessToken, {
     ...secureCookieOptions,
-    maxAge: 60 * 15,
+    maxAge: authConfig.cookieMaxAge.access,
   });
 
   cookieStore.set(authConfig.cookies.refreshToken, refreshToken, {
     ...secureCookieOptions,
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: authConfig.cookieMaxAge.refresh,
   });
 
   if (apiTokens) {
     cookieStore.set(authConfig.cookies.apiAccessToken, apiTokens.accessToken, {
       ...secureCookieOptions,
-      maxAge: 60 * 60 * 24,
+      maxAge: authConfig.cookieMaxAge.apiAccess,
     });
     cookieStore.set(authConfig.cookies.apiRefreshToken, apiTokens.refreshToken, {
       ...secureCookieOptions,
-      maxAge: 60 * 60 * 24 * 30,
+      maxAge: authConfig.cookieMaxAge.apiRefresh,
     });
   }
 }

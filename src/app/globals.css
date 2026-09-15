@@ -25,3 +25,41 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
+
+@keyframes sq-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes sq-pulse-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(37 99 235 / 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgb(37 99 235 / 0);
+  }
+}
+
+.sq-loading-ring {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 9999px;
+  border: 3px solid #dbeafe;
+  border-top-color: #2563eb;
+  animation: sq-spin 0.75s linear infinite, sq-pulse-ring 1.4s ease-in-out infinite;
+}
+
+.sq-global-loading {
+  animation: sq-fade-in 0.15s ease-out;
+}
+
+@keyframes sq-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

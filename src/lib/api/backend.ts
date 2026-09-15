@@ -114,7 +114,7 @@ export async function backendFetch(
           secure: process.env.NODE_ENV === "production",
           sameSite: "lax",
           path: "/",
-          maxAge: 60 * 60 * 24,
+          maxAge: authConfig.cookieMaxAge.apiAccess,
         });
         if (data.refreshToken) {
           store.set(authConfig.cookies.apiRefreshToken, data.refreshToken, {
@@ -122,7 +122,7 @@ export async function backendFetch(
             secure: process.env.NODE_ENV === "production",
             sameSite: "lax",
             path: "/",
-            maxAge: 60 * 60 * 24 * 30,
+            maxAge: authConfig.cookieMaxAge.apiRefresh,
           });
         }
       } catch {

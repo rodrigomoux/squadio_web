@@ -4,6 +4,22 @@ export interface OpeningHour {
   close: string;
 }
 
+export type BankHolderType = "individual" | "company";
+export type BankAccountType = "checking" | "savings";
+
+export interface EstablishmentBankAccount {
+  holderName: string;
+  holderType: BankHolderType;
+  holderDocument: string;
+  email: string;
+  bank: string;
+  branchNumber: string;
+  branchCheckDigit?: string;
+  accountNumber: string;
+  accountCheckDigit: string;
+  accountType: BankAccountType;
+}
+
 export interface Establishment {
   _id: string;
   ownerId: string;
@@ -15,6 +31,9 @@ export interface Establishment {
     coordinates: [number, number];
   };
   photos: string[];
+  bankAccount?: EstablishmentBankAccount;
+  pagarmeRecipientId?: string;
+  pagarmeRecipientStatus?: string;
   active: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -27,6 +46,7 @@ export interface EstablishmentFormData {
   lat: number;
   lng: number;
   photos?: string[];
+  bankAccount?: EstablishmentBankAccount;
 }
 
 export interface Court {
@@ -46,6 +66,8 @@ export interface Court {
   pricePerHour: number;
   /** Quadra pública: horários + chat por slot, sem reserva */
   isPublic?: boolean;
+  /** Comandas do app ativas no PDV / loja no app */
+  comandasEnabled?: boolean;
   openingHours: OpeningHour[];
   active: boolean;
   averageRating?: number;
@@ -61,6 +83,7 @@ export interface CourtFormData {
   photos?: string[];
   pricePerHour: number;
   isPublic?: boolean;
+  comandasEnabled?: boolean;
   openingHours: OpeningHour[];
 }
 
@@ -94,6 +117,7 @@ export interface Product {
 
 export interface OrderItem {
   productId: string;
+  name?: string;
   quantity: number;
   unitPrice: number;
 }
@@ -105,6 +129,12 @@ export interface Order {
   reservationId?: string;
   items: OrderItem[];
   status: string;
+  source?: "app" | "pos";
+  fulfillmentStatus?: "pending" | "delivered";
+  deliveredAt?: string;
+  userName?: string;
+  userEmail?: string;
+  courtName?: string;
   totalAmount: number;
   paymentProvider?: string;
   paymentExternalId?: string;
@@ -180,6 +210,34 @@ export interface SystemAiConfig {
   systemPrompt: string;
 }
 
+export interface SystemPaymentsConfig {
+  enabled: boolean;
+  secretKey: string;
+  publicKey: string;
+  platformRecipientId: string;
+  platformFeePercent: number;
+  pagarmeFeePercent: number;
+}
+
+export interface PaymentFeesPreview {
+  enabled: boolean;
+  platformFeePercent: number;
+  pagarmeFeePercent: number;
+  platformRecipientConfigured: boolean;
+  preview: {
+    amountReais: number;
+    grossCents: number;
+    platformFeeCents: number;
+    pagarmeFeeCents: number;
+    recipientCents: number;
+    platformTotalCents: number;
+    platformFeeReais: number;
+    pagarmeFeeReais: number;
+    recipientReais: number;
+    platformTotalReais: number;
+  };
+}
+
 export interface SystemConfig {
   establishmentDuplicateCheckEnabled: boolean;
   establishmentDuplicateRadiusMeters: number;
@@ -205,6 +263,11 @@ export interface SystemConfig {
     geminiApiKey: boolean;
     grokApiKey: boolean;
   };
+  payments: SystemPaymentsConfig;
+  paymentsConfigured: {
+    secretKey: boolean;
+    publicKey: boolean;
+  };
   updatedAt?: string;
 }
 
@@ -216,4 +279,5 @@ export type SystemConfigPatch = {
   apiKeys?: Partial<SystemApiKeysForm>;
   whatsapp?: Partial<SystemWhatsAppConfig>;
   ai?: Partial<SystemAiConfig>;
+  payments?: Partial<SystemPaymentsConfig>;
 };

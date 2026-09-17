@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DataTable, type DataColumn } from "@/components/ui/DataTable";
@@ -16,6 +16,7 @@ import { sportLabel } from "@/config/sports";
 import { isMongoObjectId } from "@/lib/auth/objectId";
 import type { AvailabilitySlot, Court, Reservation } from "@/lib/domain/types";
 import { useAuth } from "@/providers/AuthProvider";
+import { useOwnerRealtime } from "@/providers/OwnerRealtimeProvider";
 import { CourtsService, ReservationsService } from "@/services/domain/DomainService";
 
 function toDateInput(d: Date) {
@@ -120,6 +121,19 @@ export default function ReservationsPage() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courtId, date]);
+
+  useOwnerRealtime(
+    "reservation.created",
+    useCallback(
+      (event) => {
+        if (event.courtId && courtId && event.courtId !== courtId) return;
+        void loadDay();
+      },
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [courtId, date],
+    ),
+    Boolean(courtId),
+  );
 
   async function createReservation(e: FormEvent) {
     e.preventDefault();

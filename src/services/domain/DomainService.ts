@@ -9,6 +9,7 @@ import type {
   EstablishmentFormData,
   Match,
   Order,
+  PaymentFeesPreview,
   Product,
   Reservation,
   SystemConfig,
@@ -308,11 +309,17 @@ export class OrdersService {
     courtId?: string;
     mine?: boolean;
     status?: string;
+    source?: string;
+    fulfillmentStatus?: string;
   }): Promise<Order[]> {
     const qs = new URLSearchParams();
     if (params?.courtId) qs.set("courtId", params.courtId);
     if (params?.mine === false) qs.set("mine", "false");
     if (params?.status) qs.set("status", params.status);
+    if (params?.source) qs.set("source", params.source);
+    if (params?.fulfillmentStatus) {
+      qs.set("fulfillmentStatus", params.fulfillmentStatus);
+    }
     const suffix = qs.toString() ? `?${qs}` : "";
     const data = await parse<{ orders: Order[] }>(
       await apiFetch(`/api/orders${suffix}`, { credentials: "include" }),
@@ -325,6 +332,7 @@ export class OrdersService {
     items: Array<{ productId: string; quantity: number }>;
     reservationId?: string;
     payNow?: boolean;
+    source?: "app" | "pos";
   }): Promise<Order> {
     const data = await parse<{ order: Order }>(
       await apiFetch("/api/orders", {
@@ -332,6 +340,18 @@ export class OrdersService {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
+      }),
+    );
+    return data.order;
+  }
+
+  static async markDelivered(orderId: string): Promise<Order> {
+    const data = await parse<{ order: Order }>(
+      await apiFetch(`/api/orders/${orderId}/deliver`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
       }),
     );
     return data.order;
@@ -461,5 +481,16 @@ export class SystemConfigService {
       }),
     );
     return data.config;
+  }
+}
+
+export class PaymentsService {
+  static async getFees(amount = 100): Promise<PaymentFeesPreview> {
+    const data = await parse<PaymentFeesPreview>(
+      await apiFetch(`/api/payments/fees?amount=${encodeURIComponent(amount)}`, {
+        credentials: "include",
+      }),
+    );
+    return data;
   }
 }

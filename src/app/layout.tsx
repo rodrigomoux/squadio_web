@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 
 import { AuthProvider } from "@/providers/AuthProvider";
 import { LoadingProvider } from "@/providers/LoadingProvider";
+import { ToastProvider } from "@/providers/ToastProvider";
 
 import "./globals.css";
 
@@ -33,7 +34,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <AuthProvider>
-          <LoadingProvider>{children}</LoadingProvider>
+          <LoadingProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </LoadingProvider>
         </AuthProvider>
       </body>
     </html>

@@ -28,7 +28,21 @@ export default function SystemConfigPage() {
     setError(null);
     try {
       const data = await SystemConfigService.get();
-      setConfig(data);
+      setConfig({
+        ...data,
+        payments: data.payments ?? {
+          enabled: false,
+          secretKey: "",
+          publicKey: "",
+          platformRecipientId: "",
+          platformFeePercent: 0,
+          pagarmeFeePercent: 0,
+        },
+        paymentsConfigured: data.paymentsConfigured ?? {
+          secretKey: false,
+          publicKey: false,
+        },
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao carregar");
     } finally {
@@ -61,13 +75,12 @@ export default function SystemConfigPage() {
         supportEmail: config.supportEmail,
         apiKeys: {
           mapsApiKey: config.apiKeys.mapsApiKey,
-          paymentApiKey: config.apiKeys.paymentApiKey,
-          paymentSecretKey: config.apiKeys.paymentSecretKey,
           emailApiKey: config.apiKeys.emailApiKey,
           firebaseServerKey: config.apiKeys.firebaseServerKey,
         },
         whatsapp: { ...config.whatsapp },
         ai: { ...config.ai },
+        payments: { ...config.payments },
       });
       setConfig(updated);
       setSuccess("Configurações salvas.");
@@ -92,7 +105,7 @@ export default function SystemConfigPage() {
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Configurações do sistema"
-        description="Ajustes globais, WhatsApp, IA e chaves de API. Apenas admin master."
+        description="Ajustes globais, WhatsApp, IA, Pagar.me e chaves de API. Apenas admin master."
       />
 
       {error && (
@@ -375,6 +388,172 @@ export default function SystemConfigPage() {
 
           <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Pagar.me / Pagamentos
+            </h2>
+            <label className="flex items-center gap-3 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={config.payments?.enabled ?? false}
+                onChange={(e) =>
+                  setConfig({
+                    ...config,
+                    payments: {
+                      ...config.payments,
+                      enabled: e.target.checked,
+                    },
+                  })
+                }
+                className="h-4 w-4 rounded border-slate-300 text-[#2563eb]"
+              />
+              Habilitar pagamentos Pagar.me com split
+            </label>
+            <label className="block">
+              <span className={labelClass}>
+                Secret Key (sk_…)
+                {config.paymentsConfigured?.secretKey ? (
+                  <span className="ml-2 text-xs font-normal text-emerald-600">
+                    configurada
+                  </span>
+                ) : null}
+              </span>
+              <input
+                type="password"
+                autoComplete="off"
+                className={fieldClass}
+                value={config.payments?.secretKey ?? ""}
+                onChange={(e) =>
+                  setConfig({
+                    ...config,
+                    payments: {
+                      ...config.payments,
+                      secretKey: e.target.value,
+                    },
+                  })
+                }
+              />
+            </label>
+            <label className="block">
+              <span className={labelClass}>
+                Public Key (pk_…)
+                {config.paymentsConfigured?.publicKey ? (
+                  <span className="ml-2 text-xs font-normal text-emerald-600">
+                    configurada
+                  </span>
+                ) : null}
+              </span>
+              <input
+                type="password"
+                autoComplete="off"
+                className={fieldClass}
+                value={config.payments?.publicKey ?? ""}
+                onChange={(e) =>
+                  setConfig({
+                    ...config,
+                    payments: {
+                      ...config.payments,
+                      publicKey: e.target.value,
+                    },
+                  })
+                }
+              />
+            </label>
+            <label className="block">
+              <span className={labelClass}>
+                Recipient ID da plataforma (rp_…)
+              </span>
+              <input
+                className={fieldClass}
+                placeholder="rp_XXXXXXXXXXXXXXXX"
+                value={config.payments?.platformRecipientId ?? ""}
+                onChange={(e) =>
+                  setConfig({
+                    ...config,
+                    payments: {
+                      ...config.payments,
+                      platformRecipientId: e.target.value,
+                    },
+                  })
+                }
+              />
+            </label>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className={labelClass}>Taxa Squadio (%)</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.01}
+                  className={fieldClass}
+                  value={config.payments?.platformFeePercent ?? 0}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      payments: {
+                        ...config.payments,
+                        platformFeePercent: Number(e.target.value),
+                      },
+                    })
+                  }
+                />
+              </label>
+              <label className="block">
+                <span className={labelClass}>Taxa Pagar.me estimada (%)</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.01}
+                  className={fieldClass}
+                  value={config.payments?.pagarmeFeePercent ?? 0}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      payments: {
+                        ...config.payments,
+                        pagarmeFeePercent: Number(e.target.value),
+                      },
+                    })
+                  }
+                />
+              </label>
+            </div>
+            {(() => {
+              const platform = Number(config.payments?.platformFeePercent) || 0;
+              const pagarme = Number(config.payments?.pagarmeFeePercent) || 0;
+              const platformReais =
+                Math.round(((100 * platform) / 100) * 100) / 100;
+              const pagarmeReais =
+                Math.round(((100 * pagarme) / 100) * 100) / 100;
+              const recipientReais =
+                Math.round((100 - platformReais - pagarmeReais) * 100) / 100;
+              return (
+                <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                  Em R$ 100,00: dono recebe{" "}
+                  <strong>
+                    R${" "}
+                    {recipientReais.toLocaleString("pt-BR", {
+                      minimumFractionDigits: 2,
+                    })}
+                  </strong>
+                  ; Squadio + taxas{" "}
+                  <strong>
+                    R${" "}
+                    {(platformReais + pagarmeReais).toLocaleString("pt-BR", {
+                      minimumFractionDigits: 2,
+                    })}
+                  </strong>
+                  .
+                </p>
+              );
+            })()}
+            <p className="text-xs text-slate-500">
+              Deixe ******** nas chaves para manter o valor atual.
+            </p>
+          </section>
+
+          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
               Outras chaves de API
             </h2>
             <p className="text-sm text-slate-500">
@@ -384,8 +563,6 @@ export default function SystemConfigPage() {
               {(
                 [
                   ["mapsApiKey", "Maps / Geocoding", "mapsApiKey"],
-                  ["paymentApiKey", "Pagamentos (public)", "paymentApiKey"],
-                  ["paymentSecretKey", "Pagamentos (secret)", "paymentSecretKey"],
                   ["emailApiKey", "E-mail", "emailApiKey"],
                   ["firebaseServerKey", "Firebase", "firebaseServerKey"],
                 ] as const

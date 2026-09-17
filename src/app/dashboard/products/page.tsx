@@ -14,6 +14,7 @@ import {
   labelClass,
 } from "@/components/ui/PageHeader";
 import { isMongoObjectId } from "@/lib/auth/objectId";
+import { PhotoGalleryUpload } from "@/components/media/PhotoGalleryUpload";
 import type { Court, Product } from "@/lib/domain/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { CourtsService, ProductsService } from "@/services/domain/DomainService";
@@ -23,6 +24,7 @@ type ProductFormState = {
   price: string;
   stock: string;
   description: string;
+  photoUrl: string;
 };
 
 const emptyForm: ProductFormState = {
@@ -30,6 +32,7 @@ const emptyForm: ProductFormState = {
   price: "10",
   stock: "",
   description: "",
+  photoUrl: "",
 };
 
 export default function ProductsPage() {
@@ -105,6 +108,7 @@ export default function ProductsPage() {
       price: String(p.price),
       stock: p.stock == null ? "" : String(p.stock),
       description: p.description ?? "",
+      photoUrl: p.photoUrl ?? "",
     });
     setModalOpen(true);
   }
@@ -120,9 +124,13 @@ export default function ProductsPage() {
         price: Number(form.price),
         description: form.description.trim() || undefined,
         stock: form.stock === "" ? null : Number(form.stock),
+        photoUrl: form.photoUrl.trim() || undefined,
       };
       if (editing) {
-        await ProductsService.update(editing._id, payload);
+        await ProductsService.update(editing._id, {
+          ...payload,
+          photoUrl: form.photoUrl.trim(),
+        });
       } else {
         await ProductsService.create({ courtId, ...payload });
       }
@@ -155,7 +163,23 @@ export default function ProductsPage() {
       header: "Produto",
       sortable: true,
       getValue: (r) => r.name,
-      render: (r) => <span className="font-semibold text-slate-900">{r.name}</span>,
+      render: (r) => (
+        <div className="flex items-center gap-3">
+          {r.photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={r.photoUrl}
+              alt=""
+              className="h-10 w-10 rounded-lg object-cover ring-1 ring-slate-200"
+            />
+          ) : (
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
+              <span className="text-xs">—</span>
+            </div>
+          )}
+          <span className="font-semibold text-slate-900">{r.name}</span>
+        </div>
+      ),
     },
     {
       key: "description",
@@ -307,6 +331,20 @@ export default function ProductsPage() {
               className={fieldClass}
             />
           </label>
+          <div>
+            <span className={labelClass}>Foto do produto</span>
+            <div className="mt-2">
+              <PhotoGalleryUpload
+                value={form.photoUrl ? [form.photoUrl] : []}
+                onChange={(urls) =>
+                  setForm((prev) => ({ ...prev, photoUrl: urls[0] ?? "" }))
+                }
+                max={1}
+                aspect={1}
+                disabled={saving}
+              />
+            </div>
+          </div>
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
             <button
               type="button"

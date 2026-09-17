@@ -1,6 +1,14 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
 
 export type DataColumn<T> = {
   key: string;
@@ -31,12 +39,135 @@ type DataTableProps<T> = {
   actions?: RowAction<T>[];
 };
 
-function compareValues(a: string | number | null | undefined, b: string | number | null | undefined) {
+function compareValues(
+  a: string | number | null | undefined,
+  b: string | number | null | undefined,
+) {
   if (a == null && b == null) return 0;
   if (a == null) return -1;
   if (b == null) return 1;
   if (typeof a === "number" && typeof b === "number") return a - b;
   return String(a).localeCompare(String(b), "pt-BR", { sensitivity: "base" });
+}
+
+type MenuPosition = { top: number; left: number; openUp: boolean };
+
+function RowActionsMenu<T>({
+  row,
+  rowId,
+  actions,
+  open,
+  onOpenChange,
+}: {
+  row: T;
+  rowId: string;
+  actions: RowAction<T>[];
+  open: boolean;
+  onOpenChange: (id: string | null) => void;
+}) {
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<MenuPosition | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open || !buttonRef.current) {
+      setPos(null);
+      return;
+    }
+    const rect = buttonRef.current.getBoundingClientRect();
+    const menuWidth = 160;
+    const estimatedHeight = actions.length * 40 + 8;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUp = spaceBelow < estimatedHeight && rect.top > estimatedHeight;
+    const left = Math.min(
+      Math.max(8, rect.right - menuWidth),
+      window.innerWidth - menuWidth - 8,
+    );
+    setPos({
+      top: openUp ? rect.top - 4 : rect.bottom + 4,
+      left,
+      openUp,
+    });
+  }, [open, actions.length]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onOpenChange(null);
+    }
+    function onScroll() {
+      onOpenChange(null);
+    }
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [open, onOpenChange]);
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={() => onOpenChange(open ? null : rowId)}
+        className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+        aria-label="Ações"
+        aria-expanded={open}
+      >
+        <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+        </svg>
+      </button>
+      {open &&
+        pos &&
+        createPortal(
+          <>
+            <button
+              type="button"
+              className="fixed inset-0 z-[80] cursor-default"
+              aria-label="Fechar menu"
+              onClick={() => onOpenChange(null)}
+            />
+            <div
+              ref={menuRef}
+              role="menu"
+              className="fixed z-[90] w-40 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+              style={{
+                top: pos.openUp ? undefined : pos.top,
+                bottom: pos.openUp
+                  ? window.innerHeight - pos.top
+                  : undefined,
+                left: pos.left,
+              }}
+            >
+              {actions.map((action) => (
+                <button
+                  key={action.label}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    onOpenChange(null);
+                    action.onClick(row);
+                  }}
+                  className={`block w-full px-3 py-2 text-left text-sm transition hover:bg-slate-50 ${
+                    action.tone === "danger"
+                      ? "text-red-600"
+                      : "text-slate-700"
+                  }`}
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          </>,
+          document.body,
+        )}
+    </>
+  );
 }
 
 export function DataTable<T>({
@@ -152,7 +283,11 @@ export function DataTable<T>({
                     >
                       {col.header}
                       <span className="text-slate-300">
-                        {sortKey === col.key ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+                        {sortKey === col.key
+                          ? sortDir === "asc"
+                            ? "↑"
+                            : "↓"
+                          : "↕"}
                       </span>
                     </button>
                   ) : (
@@ -205,48 +340,14 @@ export function DataTable<T>({
                       </td>
                     ))}
                     {actions.length > 0 && (
-                      <td className="relative px-4 py-3.5 text-right">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setOpenMenuId((cur) => (cur === id ? null : id))
-                          }
-                          className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                          aria-label="Ações"
-                        >
-                          <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                          </svg>
-                        </button>
-                        {openMenuId === id && (
-                          <>
-                            <button
-                              type="button"
-                              className="fixed inset-0 z-10 cursor-default"
-                              aria-label="Fechar menu"
-                              onClick={() => setOpenMenuId(null)}
-                            />
-                            <div className="absolute right-4 z-20 mt-1 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
-                              {actions.map((action) => (
-                                <button
-                                  key={action.label}
-                                  type="button"
-                                  onClick={() => {
-                                    setOpenMenuId(null);
-                                    action.onClick(row);
-                                  }}
-                                  className={`block w-full px-3 py-2 text-left text-sm transition hover:bg-slate-50 ${
-                                    action.tone === "danger"
-                                      ? "text-red-600"
-                                      : "text-slate-700"
-                                  }`}
-                                >
-                                  {action.label}
-                                </button>
-                              ))}
-                            </div>
-                          </>
-                        )}
+                      <td className="px-4 py-3.5 text-right">
+                        <RowActionsMenu
+                          row={row}
+                          rowId={id}
+                          actions={actions}
+                          open={openMenuId === id}
+                          onOpenChange={setOpenMenuId}
+                        />
                       </td>
                     )}
                   </tr>

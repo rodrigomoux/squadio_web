@@ -1,5 +1,7 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
+
+import { OwnerRealtimeProvider } from "@/providers/OwnerRealtimeProvider";
 
 import { LogoutButton } from "./logout-button";
 import { SidebarNav } from "./sidebar-nav";
@@ -7,7 +9,6 @@ import { SidebarNav } from "./sidebar-nav";
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen bg-[#f0f4f8] text-slate-900">
-      {/* Sidebar — cores hex para garantir contraste mesmo se o theme falhar */}
       <aside className="hidden w-60 shrink-0 flex-col bg-[#152238] text-white md:flex">
         <div className="border-b border-white/10 px-5 py-5">
           <Link
@@ -33,7 +34,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <SidebarNav horizontal />
         </nav>
 
-        <main className="flex-1 p-4 md:p-8">{children}</main>
+        <main className="flex-1 p-4 md:p-8">
+          <Suspense fallback={null}>
+            <OwnerRealtimeProvider>{children}</OwnerRealtimeProvider>
+          </Suspense>
+        </main>
       </div>
     </div>
   );

@@ -4,8 +4,16 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { PhotoGalleryUpload } from "@/components/media/PhotoGalleryUpload";
 import { fieldClass, labelClass } from "@/components/ui/PageHeader";
-import type { Establishment, EstablishmentFormData } from "@/lib/domain/types";
-import { EstablishmentsService } from "@/services/domain/DomainService";
+import type {
+  Establishment,
+  EstablishmentBankAccount,
+  EstablishmentFormData,
+  PaymentFeesPreview,
+} from "@/lib/domain/types";
+import {
+  EstablishmentsService,
+  PaymentsService,
+} from "@/services/domain/DomainService";
 import {
   formatCep,
   geocodeAddress,
@@ -18,6 +26,19 @@ type Props = {
   onCancel?: () => void;
 };
 
+const emptyBank: EstablishmentBankAccount = {
+  holderName: "",
+  holderType: "individual",
+  holderDocument: "",
+  email: "",
+  bank: "",
+  branchNumber: "",
+  branchCheckDigit: "",
+  accountNumber: "",
+  accountCheckDigit: "",
+  accountType: "checking",
+};
+
 function toForm(est: Establishment): EstablishmentFormData {
   const [lng, lat] = est.location?.coordinates ?? [-46.6333, -23.5505];
   return {
@@ -27,6 +48,9 @@ function toForm(est: Establishment): EstablishmentFormData {
     lat,
     lng,
     photos: est.photos ?? [],
+    bankAccount: est.bankAccount
+      ? { ...emptyBank, ...est.bankAccount }
+      : { ...emptyBank },
   };
 }
 
@@ -37,6 +61,7 @@ const emptyForm: EstablishmentFormData = {
   lat: -23.5505,
   lng: -46.6333,
   photos: [],
+  bankAccount: { ...emptyBank },
 };
 
 function composeAddress(baseAddress: string, number: string): string {
@@ -46,6 +71,19 @@ function composeAddress(baseAddress: string, number: string): string {
   const comma = withoutNumber.indexOf(",");
   if (comma === -1) return `${withoutNumber}, ${n}`;
   return `${withoutNumber.slice(0, comma)}, ${n}${withoutNumber.slice(comma)}`;
+}
+
+function bankHasAnyValue(bank?: EstablishmentBankAccount): boolean {
+  if (!bank) return false;
+  return Boolean(
+    bank.holderName.trim() ||
+      bank.holderDocument.trim() ||
+      bank.email.trim() ||
+      bank.bank.trim() ||
+      bank.branchNumber.trim() ||
+      bank.accountNumber.trim() ||
+      bank.accountCheckDigit.trim(),
+  );
 }
 
 export function EstablishmentForm({ initial, onSuccess, onCancel }: Props) {
@@ -60,6 +98,7 @@ export function EstablishmentForm({ initial, onSuccess, onCancel }: Props) {
   const [cepHint, setCepHint] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [fees, setFees] = useState<PaymentFeesPreview | null>(null);
 
   useEffect(() => {
     setForm(base);
@@ -67,6 +106,25 @@ export function EstablishmentForm({ initial, onSuccess, onCancel }: Props) {
     setStreetNumber("");
     setCepHint(null);
   }, [base]);
+
+  useEffect(() => {
+    void PaymentsService.getFees(100)
+      .then(setFees)
+      .catch(() => setFees(null));
+  }, []);
+
+  function setBank<K extends keyof EstablishmentBankAccount>(
+    key: K,
+    value: EstablishmentBankAccount[K],
+  ) {
+    setForm((prev) => ({
+      ...prev,
+      bankAccount: {
+        ...(prev.bankAccount ?? emptyBank),
+        [key]: value,
+      },
+    }));
+  }
 
   async function searchCep(rawCep?: string) {
     const value = rawCep ?? cep;
@@ -133,9 +191,20 @@ export function EstablishmentForm({ initial, onSuccess, onCancel }: Props) {
       if (!form.name.trim() || !form.address.trim()) {
         throw new Error("Nome e endereço são obrigatórios");
       }
+      const payload: EstablishmentFormData = {
+        name: form.name,
+        description: form.description,
+        address: form.address,
+        lat: form.lat,
+        lng: form.lng,
+        photos: form.photos,
+      };
+      if (bankHasAnyValue(form.bankAccount)) {
+        payload.bankAccount = form.bankAccount;
+      }
       const establishment = initial?._id
-        ? await EstablishmentsService.update(initial._id, form)
-        : await EstablishmentsService.create(form);
+        ? await EstablishmentsService.update(initial._id, payload)
+        : await EstablishmentsService.create(payload);
       onSuccess?.(establishment);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao salvar");
@@ -143,6 +212,8 @@ export function EstablishmentForm({ initial, onSuccess, onCancel }: Props) {
       setLoading(false);
     }
   }
+
+  const bank = form.bankAccount ?? emptyBank;
 
   return (
     <form onSubmit={onSubmit} className="space-y-6">
@@ -243,6 +314,144 @@ export function EstablishmentForm({ initial, onSuccess, onCancel }: Props) {
             />
           </label>
         </div>
+      </section>
+
+      <section className="space-y-4 rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+          Dados para recebimento
+        </h3>
+        <p className="text-xs text-slate-500">
+          Conta bancária para receber pagamentos via split Pagar.me.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block sm:col-span-2">
+            <span className={labelClass}>Nome do titular</span>
+            <input
+              value={bank.holderName}
+              onChange={(e) => setBank("holderName", e.target.value)}
+              className={fieldClass}
+              placeholder="Como na conta bancária"
+            />
+          </label>
+          <label className="block">
+            <span className={labelClass}>Tipo</span>
+            <select
+              className={fieldClass}
+              value={bank.holderType}
+              onChange={(e) =>
+                setBank(
+                  "holderType",
+                  e.target.value as EstablishmentBankAccount["holderType"],
+                )
+              }
+            >
+              <option value="individual">Pessoa física</option>
+              <option value="company">Pessoa jurídica</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className={labelClass}>CPF / CNPJ</span>
+            <input
+              value={bank.holderDocument}
+              onChange={(e) => setBank("holderDocument", e.target.value)}
+              className={fieldClass}
+              placeholder="Somente números"
+              disabled={Boolean(initial?.pagarmeRecipientId)}
+            />
+          </label>
+          <label className="block sm:col-span-2">
+            <span className={labelClass}>E-mail do recebedor</span>
+            <input
+              type="email"
+              value={bank.email}
+              onChange={(e) => setBank("email", e.target.value)}
+              className={fieldClass}
+            />
+          </label>
+          <label className="block">
+            <span className={labelClass}>Banco (código COMPE)</span>
+            <input
+              value={bank.bank}
+              onChange={(e) => setBank("bank", e.target.value)}
+              className={fieldClass}
+              placeholder="Ex.: 341"
+            />
+          </label>
+          <label className="block">
+            <span className={labelClass}>Tipo de conta</span>
+            <select
+              className={fieldClass}
+              value={bank.accountType}
+              onChange={(e) =>
+                setBank(
+                  "accountType",
+                  e.target.value as EstablishmentBankAccount["accountType"],
+                )
+              }
+            >
+              <option value="checking">Corrente</option>
+              <option value="savings">Poupança</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className={labelClass}>Agência</span>
+            <input
+              value={bank.branchNumber}
+              onChange={(e) => setBank("branchNumber", e.target.value)}
+              className={fieldClass}
+            />
+          </label>
+          <label className="block">
+            <span className={labelClass}>Dígito da agência</span>
+            <input
+              value={bank.branchCheckDigit ?? ""}
+              onChange={(e) => setBank("branchCheckDigit", e.target.value)}
+              className={fieldClass}
+              placeholder="Opcional"
+            />
+          </label>
+          <label className="block">
+            <span className={labelClass}>Conta</span>
+            <input
+              value={bank.accountNumber}
+              onChange={(e) => setBank("accountNumber", e.target.value)}
+              className={fieldClass}
+            />
+          </label>
+          <label className="block">
+            <span className={labelClass}>Dígito da conta</span>
+            <input
+              value={bank.accountCheckDigit}
+              onChange={(e) => setBank("accountCheckDigit", e.target.value)}
+              className={fieldClass}
+            />
+          </label>
+        </div>
+        {(initial?.pagarmeRecipientId || fees) && (
+          <div className="space-y-1 text-xs text-slate-600">
+            {initial?.pagarmeRecipientId ? (
+              <p>
+                Recebedor Pagar.me:{" "}
+                <code className="rounded bg-white px-1">
+                  {initial.pagarmeRecipientId}
+                </code>
+                {initial.pagarmeRecipientStatus
+                  ? ` (${initial.pagarmeRecipientStatus})`
+                  : ""}
+              </p>
+            ) : null}
+            {fees?.preview ? (
+              <p>
+                Em R$ 100,00 com as taxas atuais: dono recebe R${" "}
+                {fees.preview.recipientReais.toLocaleString("pt-BR", {
+                  minimumFractionDigits: 2,
+                })}{" "}
+                (Squadio {fees.platformFeePercent}% + Pagar.me{" "}
+                {fees.pagarmeFeePercent}%).
+              </p>
+            ) : null}
+          </div>
+        )}
       </section>
 
       <PhotoGalleryUpload
